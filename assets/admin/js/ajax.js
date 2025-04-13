@@ -1,6 +1,6 @@
 document.addEventListener("DOMContentLoaded", function () {
   // Base URL for all AJAX requests
-  const apiUrl = "../admin/function.php";
+  const apiUrl = "../admin/ajax_handler.php";
 
   // Initialize login form if it exists
   const loginForm = document.getElementById("loginForm");
@@ -79,9 +79,9 @@ document.addEventListener("DOMContentLoaded", function () {
       // Disable button and show loading state
       submitButton.disabled = true;
       submitButton.innerHTML =
-        '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Registering...';
+        '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Creating User...';
 
-      fetch("register.php", {
+      fetch("add_admin.php", {
         method: "POST",
         body: formData,
       })
@@ -91,13 +91,17 @@ document.addEventListener("DOMContentLoaded", function () {
             // Show success message
             Swal.fire({
               icon: "success",
-              title: "Registration Successful",
+              title: "User Created Successfully",
               text: data.message,
               timer: 2000,
               showConfirmButton: false,
             }).then(() => {
-              // Redirect to login page or specified page
-              window.location.href = data.redirect || "login.php";
+              // Reset form
+              registrationForm.reset();
+              // Redirect if specified
+              if (data.redirect) {
+                window.location.href = data.redirect;
+              }
             });
           } else {
             // Show error message
@@ -107,11 +111,11 @@ document.addEventListener("DOMContentLoaded", function () {
               <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
           `;
-
-            // Reset button state
-            submitButton.disabled = false;
-            submitButton.textContent = "Register";
           }
+
+          // Reset button state
+          submitButton.disabled = false;
+          submitButton.textContent = "Create User";
         })
         .catch((error) => {
           console.error("Error:", error);
@@ -125,7 +129,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
           // Reset button state
           submitButton.disabled = false;
-          submitButton.textContent = "Register";
+          submitButton.textContent = "Create User";
         });
     });
   }
@@ -1020,6 +1024,11 @@ document.addEventListener("DOMContentLoaded", function () {
             null
           );
           this.contacts.fetch();
+          break;
+
+        case "add_admin":
+          // No initialization needed as the registration form handler is already set up
+          console.log("Admin registration page initialized");
           break;
 
         default:
