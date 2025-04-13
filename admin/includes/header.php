@@ -130,7 +130,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             class="d-none d-md-inline"><?php echo htmlspecialchars($_SESSION['username'] ?? 'Admin'); ?></span>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                        <li><a class="dropdown-item" href="#"><i class="bi bi-person me-2"></i>Profile</a></li>
+                        <li><a class="dropdown-item" href="profile.php"><i class="bi bi-person me-2"></i>Profile</a>
+                        </li>
                         <li><a class="dropdown-item" href="settings.php"><i class="bi bi-gear me-2"></i>Settings</a>
                         </li>
                         <li>

@@ -14,11 +14,16 @@ function createBlog($conn, $data, $file)
     $short_description = $data['short_description'];
     $content = $data['content'];
     $category_id = $data['category_id'];
-    $image = $file['image']['name'];
 
-    $target_dir = "../assets/uploads/";
-    $target_file = $target_dir . basename($image);
-    move_uploaded_file($file['image']['tmp_name'], $target_file);
+    // Use the secure file upload handler with blogs prefix
+    $image = '';
+    if (!empty($file['image']['name'])) {
+        try {
+            $image = handleFileUpload($file['image'], 'blog');
+        } catch (Exception $e) {
+            throw new Exception("Image upload failed: " . $e->getMessage());
+        }
+    }
 
     $query = "INSERT INTO blogs (title, short_description, content, category_id, image) VALUES (?, ?, ?, ?, ?)";
     $stmt = $conn->prepare($query);
@@ -32,17 +37,24 @@ function updateBlog($conn, $data, $file)
     $short_description = $data['short_description'];
     $content = $data['content'];
     $category_id = $data['category_id'];
-    $image = $file['image']['name'];
 
-    if ($image) {
-        $target_dir = "../assets/uploads/";
-        $target_file = $target_dir . basename($image);
-        move_uploaded_file($file['image']['tmp_name'], $target_file);
+    // Use secure file upload function if a new image is uploaded
+    $image_query_part = "";
+    $params = [$title, $short_description, $content, $category_id, $id];
+
+    if (!empty($file['image']['name'])) {
+        try {
+            $image = handleFileUpload($file['image'], 'blog');
+            $image_query_part = ", image = ?";
+            array_splice($params, -1, 0, [$image]); // Insert image before id
+        } catch (Exception $e) {
+            throw new Exception("Image upload failed: " . $e->getMessage());
+        }
     }
 
-    $query = "UPDATE blogs SET title = ?, short_description = ?, content = ?, category_id = ?, image = ? WHERE id = ?";
+    $query = "UPDATE blogs SET title = ?, short_description = ?, content = ?, category_id = ?" . $image_query_part . " WHERE id = ?";
     $stmt = $conn->prepare($query);
-    $stmt->execute([$title, $short_description, $content, $category_id, $image, $id]);
+    $stmt->execute($params);
 }
 
 function deleteBlog($conn, $id)
@@ -64,29 +76,47 @@ function createEvent($conn, $data, $file)
     $title = $data['title'];
     $description = $data['description'];
     $event_date = $data['event_date'];
-    $image = $file['image']['name'];
 
-    $target_dir = "../assets/uploads/";
-    $target_file = $target_dir . basename($image);
-    move_uploaded_file($file['image']['tmp_name'], $target_file);
+    // Use the secure file upload handler with event prefix
+    $image = '';
+    if (!empty($file['image']['name'])) {
+        try {
+            $image = handleFileUpload($file['image'], 'event');
+        } catch (Exception $e) {
+            throw new Exception("Image upload failed: " . $e->getMessage());
+        }
+    }
 
     $query = "INSERT INTO events (title, description, event_date, image) VALUES (?, ?, ?, ?)";
     $stmt = $conn->prepare($query);
     $stmt->execute([$title, $description, $event_date, $image]);
 }
 
-function updateEvent($conn, $data, $file)
+function updateEvent($conn, $id, $data, $file)
 {
-    $id = $data['id'];
     $title = $data['title'];
     $description = $data['description'];
     $event_date = $data['event_date'];
-    $image = $file['image']['name'];
 
-    if ($image) {
-        $target_dir = "../assets/uploads/";
-        $target_file = $target_dir . basename($image);
-        move_uploaded_file($file['image']['tmp_name'], $target_file);
+    // Get existing event to check if we need to update the image
+    $query = "SELECT image FROM events WHERE id = ?";
+    $stmt = $conn->prepare($query);
+    $stmt->execute([$id]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    $image = $result['image'];
+
+    // Use the secure file upload handler if a new image is provided
+    if (!empty($file['image']['name'])) {
+        try {
+            $image = handleFileUpload($file['image'], 'event');
+            // Remove old image if it exists and is different
+            if (!empty($result['image']) && $result['image'] != $image && file_exists("../assets/uploads/" . $result['image'])) {
+                unlink("../assets/uploads/" . $result['image']);
+            }
+        } catch (Exception $e) {
+            throw new Exception("Image upload failed: " . $e->getMessage());
+        }
     }
 
     $query = "UPDATE events SET title = ?, description = ?, event_date = ?, image = ? WHERE id = ?";
@@ -113,11 +143,16 @@ function createService($conn, $data, $file)
     $title = $data['title'];
     $description = $data['description'];
     $category_id = $data['category_id'];
-    $image = $file['image']['name'];
 
-    $target_dir = "../assets/uploads/";
-    $target_file = $target_dir . basename($image);
-    move_uploaded_file($file['image']['tmp_name'], $target_file);
+    // Use the secure file upload handler with service prefix
+    $image = '';
+    if (!empty($file['image']['name'])) {
+        try {
+            $image = handleFileUpload($file['image'], 'service');
+        } catch (Exception $e) {
+            throw new Exception("Image upload failed: " . $e->getMessage());
+        }
+    }
 
     $query = "INSERT INTO services (title, description, category_id, image) VALUES (?, ?, ?, ?)";
     $stmt = $conn->prepare($query);
@@ -130,12 +165,19 @@ function updateService($conn, $data, $file)
     $title = $data['title'];
     $description = $data['description'];
     $category_id = $data['category_id'];
-    $image = $file['image']['name'];
 
-    if ($image) {
-        $target_dir = "../assets/uploads/";
-        $target_file = $target_dir . basename($image);
-        move_uploaded_file($file['image']['tmp_name'], $target_file);
+    // Use the secure file upload handler for the updated image
+    $image = $data['old_image'];
+    if (!empty($file['image']['name'])) {
+        try {
+            $image = handleFileUpload($file['image'], 'service');
+            // Delete old image if it exists and a new one was uploaded
+            if (!empty($data['old_image']) && file_exists('../assets/uploads/' . $data['old_image'])) {
+                unlink('../assets/uploads/' . $data['old_image']);
+            }
+        } catch (Exception $e) {
+            throw new Exception("Image upload failed: " . $e->getMessage());
+        }
     }
 
     $query = "UPDATE services SET title = ?, description = ?, category_id = ?, image = ? WHERE id = ?";
@@ -148,6 +190,27 @@ function deleteService($conn, $id)
     $query = "DELETE FROM services WHERE id = ?";
     $stmt = $conn->prepare($query);
     $stmt->execute([$id]);
+}
+
+function addService($conn, $data, $file)
+{
+    $title = $data['title'];
+    $description = $data['description'];
+    $category_id = $data['category_id'];
+
+    // Use the secure file upload handler
+    $image = '';
+    if (!empty($file['image']['name'])) {
+        try {
+            $image = handleFileUpload($file['image'], 'service');
+        } catch (Exception $e) {
+            throw new Exception("Image upload failed: " . $e->getMessage());
+        }
+    }
+
+    $query = "INSERT INTO services (title, description, category_id, image) VALUES (?, ?, ?, ?)";
+    $stmt = $conn->prepare($query);
+    $stmt->execute([$title, $description, $category_id, $image]);
 }
 
 // Category functions
@@ -333,62 +396,70 @@ function handleLogin($conn, $data)
  */
 function handleRegistration($conn, $data)
 {
-    $full_name = $data['name'] ?? ''; // Keep accepting 'name' from form for backwards compatibility
-    $email = $data['email'] ?? '';
-    $username = $data['username'] ?? '';
-    $password = $data['password'] ?? '';
+    // Initialize response
+    $response = ['success' => false, 'message' => ''];
 
-    // Validation
-    if (empty($full_name) || empty($email) || empty($username) || empty($password)) {
-        return ['success' => false, 'message' => 'All fields are required.'];
+    // Validate required fields
+    $requiredFields = ['name', 'email', 'username', 'password', 'role'];
+    foreach ($requiredFields as $field) {
+        if (empty($data[$field])) {
+            $response['message'] = ucfirst($field) . ' is required';
+            return $response;
+        }
     }
 
-    // Check if the email already exists
-    $query = "SELECT COUNT(*) FROM users WHERE email = ?";
-    $stmt = $conn->prepare($query);
-    $stmt->execute([$email]);
-    $emailExists = $stmt->fetchColumn();
+    // Extract user data
+    $name = htmlspecialchars(trim($data['name']));
+    $email = filter_var(trim($data['email']), FILTER_SANITIZE_EMAIL);
+    $username = htmlspecialchars(trim($data['username']));
+    $password = $data['password']; // Will be encrypted
+    $role = htmlspecialchars(trim($data['role']));
 
-    if ($emailExists) {
-        return ['success' => false, 'message' => 'The email address is already registered. Please use a different email.'];
-    }
-
-    // Check if the username already exists
-    $query = "SELECT COUNT(*) FROM users WHERE username = ?";
-    $stmt = $conn->prepare($query);
-    $stmt->execute([$username]);
-    $usernameExists = $stmt->fetchColumn();
-
-    if ($usernameExists) {
-        return ['success' => false, 'message' => 'Username already taken. Please choose a different username.'];
+    // Validate email
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $response['message'] = 'Invalid email format';
+        return $response;
     }
 
     try {
+        // Check if username or email already exists
+        $checkQuery = "SELECT COUNT(*) as count FROM users WHERE username = ? OR email = ?";
+        $checkStmt = $conn->prepare($checkQuery);
+        $checkStmt->execute([$username, $email]);
+        $result = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($result['count'] > 0) {
+            $response['message'] = 'Username or email already exists';
+            return $response;
+        }
+
         // Generate a unique IV for AES encryption
         $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length('AES-256-CBC'));
 
-        // Encrypt the password using AES with the generated IV
+        // Encrypt the password using AES
         $encrypted_password = openssl_encrypt($password, 'AES-256-CBC', AES_KEY, 0, $iv);
 
         // Store the IV as a base64-encoded string alongside the encrypted password
         $iv_base64 = base64_encode($iv);
 
-        // Default role is 'user' unless explicitly specified as 'admin'
-        $role = $data['role'] ?? 'user';
+        // Insert user into database
+        $insertQuery = "INSERT INTO users (full_name, email, username, password, iv, role, created_at) 
+                        VALUES (?, ?, ?, ?, ?, ?, NOW())";
+        $insertStmt = $conn->prepare($insertQuery);
+        $result = $insertStmt->execute([$name, $email, $username, $encrypted_password, $iv_base64, $role]);
 
-        // Insert the new user - removed phone field since it doesn't exist in the users table
-        $query = "INSERT INTO users (full_name, email, username, password, iv, role) VALUES (?, ?, ?, ?, ?, ?)";
-        $stmt = $conn->prepare($query);
-        $stmt->execute([$full_name, $email, $username, $encrypted_password, $iv_base64, $role]);
-
-        return [
-            'success' => true,
-            'message' => 'Registration successful! You can now login.',
-            'redirect' => 'login.php'
-        ];
+        if ($result) {
+            $response['success'] = true;
+            $response['message'] = 'User created successfully';
+            $response['redirect'] = 'index.php';
+        } else {
+            $response['message'] = 'Failed to create user';
+        }
     } catch (PDOException $e) {
-        return ['success' => false, 'message' => 'Registration failed: ' . $e->getMessage()];
+        $response['message'] = 'Database error: ' . $e->getMessage();
     }
+
+    return $response;
 }
 
 /**
@@ -412,92 +483,100 @@ function getUserById($conn, $user_id)
 
 /**
  * Update user profile
- * @param PDO $conn Database connection
- * @param array $data User data to update
- * @return array Response with success status and message
+ * @param int $id User ID
+ * @param string $name User name
+ * @param string $email User email
+ * @param string $password User password
+ * @param string $image User image
+ * @param string $phone User phone
+ * @param string $address User address
+ * @return bool
  */
-function updateUserProfile($conn, $data)
+function updateUserProfile($conn, $id, $data, $files)
 {
     try {
-        $user_id = $data['user_id'] ?? 0;
-        $full_name = $data['full_name'] ?? '';
-        $current_password = $data['current_password'] ?? '';
-        $new_password = $data['new_password'] ?? '';
-
-        // Validate inputs
-        if (empty($user_id) || empty($full_name) || empty($current_password)) {
-            return [
-                'success' => false,
-                'message' => 'Required fields are missing'
-            ];
-        }
-
         // Get current user data
-        $query = "SELECT * FROM users WHERE id = ? LIMIT 1";
-        $stmt = $conn->prepare($query);
-        $stmt->execute([$user_id]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
+        $user = getUserById($conn, $id);
         if (!$user) {
-            return [
-                'success' => false,
-                'message' => 'User not found'
-            ];
+            throw new Exception("User not found");
         }
 
-        // Verify current password
-        $iv = base64_decode($user['iv']);
-        $decrypted_password = openssl_decrypt($user['password'], 'AES-256-CBC', AES_KEY, 0, $iv);
+        // Extract and sanitize data
+        $name = htmlspecialchars(trim($data['name'] ?? $user['full_name']));
+        $email = filter_var(trim($data['email'] ?? $user['email']), FILTER_SANITIZE_EMAIL);
+        $phone = isset($data['phone']) ? htmlspecialchars(trim($data['phone'])) : ($user['phone'] ?? null);
+        $address = isset($data['address']) ? htmlspecialchars(trim($data['address'])) : ($user['address'] ?? null);
 
-        if ($decrypted_password !== $current_password) {
-            return [
-                'success' => false,
-                'message' => 'Current password is incorrect'
-            ];
+        // Handle image upload using our secure function
+        $image = $user['image'] ?? null;
+        if (!empty($files['image']['name'])) {
+            try {
+                $image = handleFileUpload($files['image'], 'profile');
+
+                // Remove old image if exists
+                if (!empty($user['image']) && file_exists("../assets/uploads/" . $user['image'])) {
+                    unlink("../assets/uploads/" . $user['image']);
+                }
+            } catch (Exception $e) {
+                throw new Exception("Profile image upload failed: " . $e->getMessage());
+            }
         }
 
-        // Begin transaction
-        $conn->beginTransaction();
+        // Handle password update if provided
+        $passwordUpdate = "";
+        $params = [$name, $email, $phone, $address, $image, $id];
 
-        // Always update name
-        $query = "UPDATE users SET full_name = ? WHERE id = ?";
-        $stmt = $conn->prepare($query);
-        $stmt->execute([$full_name, $user_id]);
-
-        // Update password if provided
-        if (!empty($new_password)) {
+        if (!empty($data['password'])) {
             // Generate a unique IV for AES encryption
-            $new_iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length('AES-256-CBC'));
+            $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length('AES-256-CBC'));
 
-            // Encrypt the new password
-            $encrypted_password = openssl_encrypt($new_password, 'AES-256-CBC', AES_KEY, 0, $new_iv);
+            // Encrypt the password using AES
+            $encrypted_password = openssl_encrypt($data['password'], 'AES-256-CBC', AES_KEY, 0, $iv);
 
             // Store the IV as a base64-encoded string alongside the encrypted password
-            $iv_base64 = base64_encode($new_iv);
+            $iv_base64 = base64_encode($iv);
 
-            // Update the password and IV
-            $query = "UPDATE users SET password = ?, iv = ? WHERE id = ?";
-            $stmt = $conn->prepare($query);
-            $stmt->execute([$encrypted_password, $iv_base64, $user_id]);
+            $passwordUpdate = ", password = ?, iv = ?";
+            array_splice($params, -1, 0, [$encrypted_password, $iv_base64]);
         }
 
-        // Commit transaction
-        $conn->commit();
+        // Update user in database
+        $query = "UPDATE users SET full_name = ?, email = ?, phone = ?, address = ?, image = ?{$passwordUpdate} WHERE id = ?";
+        $stmt = $conn->prepare($query);
+        $result = $stmt->execute($params);
 
-        return [
-            'success' => true,
-            'message' => 'Profile updated successfully'
-        ];
-    } catch (PDOException $e) {
-        // Rollback transaction on error
-        if ($conn->inTransaction()) {
-            $conn->rollBack();
+        if ($result) {
+            return ['success' => true, 'message' => 'Profile updated successfully'];
+        } else {
+            throw new Exception("Database update failed");
         }
-        error_log("Error updating profile: " . $e->getMessage());
-        return [
-            'success' => false,
-            'message' => 'An error occurred: ' . $e->getMessage()
-        ];
+
+    } catch (Exception $e) {
+        error_log("Profile update error: " . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Handle file uploads
+ * @param array $file $_FILES array element
+ * @param string $prefix File name prefix
+ * @return string File name or empty string on failure
+ */
+function handleFileUpload($file, $prefix = '')
+{
+    // Include the config functions
+    require_once '../config/function.php';
+
+    // Use the secure upload function from Utility class
+    $result = Utility::uploadFile($file, $prefix);
+
+    // If successful, return the filename, otherwise throw an exception
+    if ($result['success']) {
+        return $result['filename'];
+    } else {
+        error_log("File upload error: " . $result['message']);
+        throw new Exception($result['message']);
     }
 }
 
@@ -645,13 +724,27 @@ function saveSettingsBatch($conn, $data, $files)
 
             // File uploads
             if (!empty($files['logo']['name'])) {
-                $logo_filename = handleFileUpload($files['logo'], 'logo');
-                saveSetting($conn, 'general', 'logo', $logo_filename);
+                // Use our secure upload function from Utility class
+                require_once '../config/function.php';
+                $result = Utility::uploadFile($files['logo'], 'logo');
+
+                if ($result['success']) {
+                    saveSetting($conn, 'general', 'logo', $result['filename']);
+                } else {
+                    throw new Exception($result['message']);
+                }
             }
 
             if (!empty($files['favicon']['name'])) {
-                $favicon_filename = handleFileUpload($files['favicon'], 'favicon');
-                saveSetting($conn, 'general', 'favicon', $favicon_filename);
+                // Use our secure upload function from Utility class
+                require_once '../config/function.php';
+                $result = Utility::uploadFile($files['favicon'], 'favicon');
+
+                if ($result['success']) {
+                    saveSetting($conn, 'general', 'favicon', $result['filename']);
+                } else {
+                    throw new Exception($result['message']);
+                }
             }
 
             $response['message'] = 'General settings saved successfully';
@@ -751,43 +844,6 @@ function deleteSetting($conn, $group, $key)
     } catch (PDOException $e) {
         error_log("Error deleting setting: " . $e->getMessage());
         return false;
-    }
-}
-
-/**
- * Handle file uploads
- * @param array $file $_FILES array element
- * @param string $prefix File name prefix
- * @return string File name
- */
-function handleFileUpload($file, $prefix = '')
-{
-    $target_dir = "../assets/uploads/";
-    $file_extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-    $new_filename = $prefix . '_' . time() . '.' . $file_extension;
-    $target_path = $target_dir . $new_filename;
-
-    // Check if file is an actual image
-    $check = getimagesize($file['tmp_name']);
-    if ($check === false) {
-        throw new Exception("File is not an image");
-    }
-
-    // Check file size (max 2MB)
-    if ($file['size'] > 2000000) {
-        throw new Exception("File is too large. Max size is 2MB");
-    }
-
-    // Check file type
-    $allowed_types = ['jpg', 'jpeg', 'png', 'gif', 'ico'];
-    if (!in_array($file_extension, $allowed_types)) {
-        throw new Exception("Only JPG, JPEG, PNG, GIF, and ICO files are allowed");
-    }
-
-    if (move_uploaded_file($file['tmp_name'], $target_path)) {
-        return $new_filename;
-    } else {
-        throw new Exception("Error uploading file");
     }
 }
 
@@ -1051,80 +1107,31 @@ function applySeoMeta($conn, $route)
 
 // Process AJAX requests for settings
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Check if this is a JSON request
-    $contentType = isset($_SERVER['CONTENT_TYPE']) ? $_SERVER['CONTENT_TYPE'] : '';
-    $isJsonRequest = strpos($contentType, 'application/json') !== false;
-
-    // Parse JSON input if it's a JSON request
-    if ($isJsonRequest) {
-        $json_data = json_decode(file_get_contents('php://input'), true);
-        if ($json_data && isset($json_data['event'])) {
-            $event = $json_data['event'];
-            // Handle JSON events here
-            $response = ['success' => false, 'message' => 'Unknown event'];
-
-            if ($event === 'fetch_blogs') {
-                $response = fetchBlogsWithCategories($conn);
-            } elseif ($event === 'fetch_events') {
-                $response = fetchEventsWithCategories($conn);
-            } elseif ($event === 'fetch_services') {
-                $response = fetchServicesWithCategories($conn);
-            } elseif ($event === 'fetch_categories') {
-                $response = fetchCategories($conn);
-            } elseif ($event === 'fetch_categories_by_type') {
-                $type = $json_data['type'] ?? '';
-                $response = fetchCategoriesByType($conn, $type);
-            } elseif ($event === 'fetch_contact_submissions') {
-                $response = fetchContactSubmissionsWithCategories($conn);
-            } elseif ($event === 'post_blog' || $event === 'update_blog') {
-                // Handle blog creation/update - simplified for JSON example
-                $response = ['success' => true, 'message' => 'Blog operation successful'];
-            } elseif ($event === 'post_event' || $event === 'update_event') {
-                $response = ['success' => true, 'message' => 'Event operation successful'];
-            } elseif ($event === 'post_service' || $event === 'update_service') {
-                $response = ['success' => true, 'message' => 'Service operation successful'];
-            } elseif ($event === 'post_category' || $event === 'update_category') {
-                $response = ['success' => true, 'message' => 'Category operation successful'];
-            } elseif (
-                $event === 'delete_blog' || $event === 'delete_event' ||
-                $event === 'delete_service' || $event === 'delete_category'
-            ) {
-                $id = $json_data['id'] ?? 0;
-                if ($id) {
-                    $response = ['success' => true, 'message' => 'Item deleted successfully'];
-                } else {
-                    $response = ['success' => false, 'error' => 'Invalid ID'];
-                }
-            }
-
-            header('Content-Type: application/json');
-            echo json_encode($response);
-            exit;
-        }
-    }
-
-    // Handle regular form submissions
-    // Process general settings
+    // General settings
     if (isset($_POST['event']) && $_POST['event'] === 'save_general_settings') {
         $response = ['success' => false, 'message' => ''];
 
         try {
-            // Process text fields
-            $text_fields = ['site_name', 'site_tagline', 'contact_email', 'contact_phone', 'address', 'footer_text'];
-            foreach ($text_fields as $field) {
+            // Save text fields
+            $fields = ['site_name', 'site_tagline', 'contact_email', 'contact_phone', 'address', 'footer_text'];
+            foreach ($fields as $field) {
                 if (isset($_POST[$field])) {
                     saveSetting($conn, 'general', $field, $_POST[$field]);
                 }
             }
 
-            // Process file uploads
+            // Handle file uploads (logo, favicon)
             $file_fields = ['logo', 'favicon'];
-
             foreach ($file_fields as $field) {
                 if (isset($_FILES[$field]) && $_FILES[$field]['error'] === UPLOAD_ERR_OK) {
-                    $new_filename = handleFileUpload($_FILES[$field], $field);
-                    if ($new_filename !== false) {
-                        saveSetting($conn, 'general', $field, $new_filename);
+                    // Use our secure upload function from Utility class
+                    require_once '../config/function.php';
+                    $upload_result = Utility::uploadFile($_FILES[$field], $field);
+
+                    if ($upload_result['success']) {
+                        saveSetting($conn, 'general', $field, $upload_result['filename']);
+                    } else {
+                        throw new Exception($upload_result['message']);
                     }
                 }
             }
