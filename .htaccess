@@ -1,0 +1,9 @@
+RewriteEngine On
+
+# Exclude admin directory from rewrite rules
+RewriteCond %{REQUEST_URI} ^/admin/ [NC]
+RewriteRule ^ - [L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
